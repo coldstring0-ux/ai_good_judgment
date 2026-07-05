@@ -22,6 +22,26 @@ const MODEL_MAP: Record<string, Record<string, string>> = {
   },
 };
 
+function parseJSON(content: string | null | undefined): any {
+  if (!content) return {};
+  let cleaned = content.replace(/```(?:json)?\s*/gi, "").replace(/```/g, "").trim();
+  const braceStart = cleaned.indexOf("{");
+  const braceEnd = cleaned.lastIndexOf("}");
+  if (braceStart !== -1 && braceEnd !== -1) {
+    cleaned = cleaned.slice(braceStart, braceEnd + 1);
+  }
+  try {
+    return JSON.parse(cleaned);
+  } catch {
+    try {
+      cleaned = cleaned.replace(/'/g, '"').replace(/,\s*}/g, "}").replace(/,\s*\]/g, "]");
+      return JSON.parse(cleaned);
+    } catch {
+      return {};
+    }
+  }
+}
+
 function getProvider(apiKey?: string) {
   const provider = process.env.AI_PROVIDER ?? "deepseek";
   const config = PROVIDER_CONFIG[provider];
@@ -55,7 +75,7 @@ export async function generateDrill(params: {
     response_format: { type: "json_object" },
   });
 
-  return JSON.parse(response.choices[0]?.message?.content ?? "{}");
+  return parseJSON(response.choices[0]?.message?.content);
 }
 
 export async function getCoachingFeedback(params: {
@@ -98,7 +118,7 @@ export async function getBayesianUpdate(params: {
     response_format: { type: "json_object" },
   });
 
-  return JSON.parse(response.choices[0]?.message?.content ?? "{}");
+  return parseJSON(response.choices[0]?.message?.content);
 }
 
 export async function getBiasAnalysis(predictions: Array<{
@@ -117,7 +137,7 @@ export async function getBiasAnalysis(predictions: Array<{
     response_format: { type: "json_object" },
   });
 
-  return JSON.parse(response.choices[0]?.message?.content ?? "{}");
+  return parseJSON(response.choices[0]?.message?.content);
 }
 
 export async function gradeSource(params: {
@@ -136,7 +156,7 @@ export async function gradeSource(params: {
     response_format: { type: "json_object" },
   });
 
-  return JSON.parse(response.choices[0]?.message?.content ?? "{}");
+  return parseJSON(response.choices[0]?.message?.content);
 }
 
 // Prompt templates

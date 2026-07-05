@@ -11,6 +11,9 @@ export const users = sqliteTable("users", {
     dailyReminder?: boolean;
     theme?: "light" | "dark";
     domains?: string[];
+    deepseekKey?: string;
+    openaiKey?: string;
+    aiProvider?: "deepseek" | "openai";
   }>().default({}),
   createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
 });
@@ -25,11 +28,10 @@ export const drills = sqliteTable("drills", {
   phase: integer("phase").notNull(),
   question: text("question").notNull(),
   metadata: text("metadata", { mode: "json" }).$type<{
-    correctAnswer?: string | number;
+    correctAnswer?: string | number | [number, number];
     explanation?: string;
     difficulty?: "easy" | "medium" | "hard";
     biasType?: string;
-    correctRange?: [number, number];
   }>().default({}),
   userResponse: text("user_response", { mode: "json" }).$type<{
     probability?: number;

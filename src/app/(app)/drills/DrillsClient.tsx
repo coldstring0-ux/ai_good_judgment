@@ -22,6 +22,7 @@ interface DrillData {
 interface DrillsClientProps {
   initialDrills: DrillData[];
   userId: string;
+  phase: number;
 }
 
 const drillConfig = {
@@ -39,12 +40,12 @@ const biasOptions = [
   { value: "sunk_cost", label: "沉没成本谬误" },
 ];
 
-export function DrillsClient({ initialDrills, userId }: DrillsClientProps) {
+export function DrillsClient({ initialDrills, userId, phase }: DrillsClientProps) {
   const [activeType, setActiveType] = useState<"quantification" | "bias_check" | "confidence_interval">("quantification");
   const [drill, setDrill] = useState<DrillData | null>(null);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [feedback, setFeedback] = useState<{ score: number; feedback: string; explanation: string } | null>(null);
+  const [feedback, setFeedback] = useState<{ score: number; feedback: string; explanation: string; aiFeedback?: string } | null>(null);
   const [history, setHistory] = useState(initialDrills);
 
   // Form state
@@ -67,7 +68,7 @@ export function DrillsClient({ initialDrills, userId }: DrillsClientProps) {
       const res = await fetch("/api/drills/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type, phase: 1, userId }),
+        body: JSON.stringify({ type, phase, userId }),
       });
       const data = await res.json();
 
@@ -318,6 +319,12 @@ export function DrillsClient({ initialDrills, userId }: DrillsClientProps) {
               <div className="bg-muted/50 rounded-lg p-3">
                 <p className="text-xs font-medium text-muted-foreground mb-1">解析</p>
                 <p className="text-sm">{feedback.explanation}</p>
+              </div>
+            )}
+            {feedback.aiFeedback && (
+              <div className="bg-primary/5 rounded-lg p-3">
+                <p className="text-xs font-medium text-muted-foreground mb-1">AI 教练反馈</p>
+                <p className="text-sm whitespace-pre-wrap">{feedback.aiFeedback}</p>
               </div>
             )}
             <Button variant="outline" onClick={() => { setDrill(null); setFeedback(null); }}>

@@ -1,7 +1,8 @@
 import { db } from "@/lib/db/client";
-import { drills } from "@/lib/db/schema";
+import { drills, users } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
-import { v4 as uuid } from "uuid";
+import { getCoachingFeedback } from "@/lib/ai";
+import { decrypt } from "@/lib/utils/crypto";
 
 export async function POST(req: Request) {
   try {
@@ -22,10 +23,10 @@ export async function POST(req: Request) {
     let feedback = "";
 
     if (drill.type === "quantification") {
-      const correctRange = (drill.metadata as any)?.correctAnswer as [number, number] | undefined;
+      const correctRange = drill.metadata?.correctAnswer as [number, number] | undefined;
       const userProb = response.probability;
 
-      if (correctRange && userProb !== undefined) {
+      if (Array.isArray(correctRange) && userProb !== undefined) {
         if (userProb >= correctRange[0] && userProb <= correctRange[1]) {
           score = 1.0;
           feedback = `准确！你的回答 ${userProb}% 在正确范围 ${correctRange[0]}-${correctRange[1]}% 内。`;
@@ -39,7 +40,7 @@ export async function POST(req: Request) {
         }
       }
     } else if (drill.type === "bias_check") {
-      const correctBias = (drill.metadata as any)?.biasType;
+      const correctBias = drill.metadata?.biasType;
       if (correctBias && response.selectedBias) {
         score = correctBias === response.selectedBias ? 1.0 : 0.0;
         feedback = correctBias === response.selectedBias
@@ -47,8 +48,7 @@ export async function POST(req: Request) {
           : `这其实是 ${correctBias} 而非 ${response.selectedBias}。`;
       }
     } else if (drill.type === "confidence_interval") {
-      // CI drills: score based on whether the interval contains the answer
-      const correctAnswer = (drill.metadata as any)?.correctAnswer as number | undefined;
+      const correctAnswer = drill.metadata?.correctAnswer as number | undefined;
       if (correctAnswer !== undefined && response.lowerBound !== undefined && response.upperBound !== undefined) {
         const contains = response.lowerBound <= correctAnswer && correctAnswer <= response.upperBound;
         score = contains ? 1.0 : 0.0;
@@ -67,13 +67,32 @@ export async function POST(req: Request) {
       })
       .where(eq(drills.id, drillId));
 
-    // Generate coaching feedback if scoring had content
-    const explanation = (drill.metadata as any)?.explanation ?? "";
+    // Try to get AI coaching feedback
+    let aiFeedback: string | undefined;
+    try {
+      const user = await db.select().from(users).where(eq(users.id, userId)).then(r => r[0]);
+      const settings = (user?.settings as Record<string, any>) ?? {};
+      const encryptedKey = settings.deepseekKey ?? settings.openaiKey;
+      const apiKey = encryptedKey ? decrypt(encryptedKey) : undefined;
+
+      aiFeedback = await getCoachingFeedback({
+        question: drill.question,
+        probability: response.probability ?? 0,
+        reasoning: response.reflection ?? "",
+        biasNotes: response.selectedBias ?? undefined,
+        apiKey,
+      });
+    } catch {
+      // AI feedback is optional; silently fall through
+    }
+
+    const explanation = drill.metadata?.explanation ?? "";
 
     return Response.json({
       score,
       feedback: feedback || "已记录你的回答。",
       explanation,
+      aiFeedback,
     });
   } catch (error) {
     console.error("Drill submission error:", error);

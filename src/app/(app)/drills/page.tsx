@@ -1,7 +1,7 @@
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db/client";
-import { drills as drillsTable } from "@/lib/db/schema";
+import { drills as drillsTable, users } from "@/lib/db/schema";
 import { eq, desc } from "drizzle-orm";
 import { DrillsClient } from "./DrillsClient";
 
@@ -10,14 +10,19 @@ async function getDrills() {
   if (!session?.user?.id) redirect("/login");
 
   const userId = session.user.id as string;
-  const userDrills = await db.select()
-    .from(drillsTable)
-    .where(eq(drillsTable.userId, userId))
-    .orderBy(desc(drillsTable.createdAt))
-    .limit(20);
+
+  const [user, userDrills] = await Promise.all([
+    db.select().from(users).where(eq(users.id, userId)).then(r => r[0]),
+    db.select()
+      .from(drillsTable)
+      .where(eq(drillsTable.userId, userId))
+      .orderBy(desc(drillsTable.createdAt))
+      .limit(20),
+  ]);
 
   return {
     userId,
+    phase: user?.phase ?? 1,
     drills: userDrills.map(d => ({
       id: d.id,
       type: d.type,
@@ -32,6 +37,6 @@ async function getDrills() {
 }
 
 export default async function DrillsPage() {
-  const { userId, drills } = await getDrills();
-  return <DrillsClient initialDrills={drills} userId={userId} />;
+  const { userId, phase, drills } = await getDrills();
+  return <DrillsClient initialDrills={drills} userId={userId} phase={phase} />;
 }

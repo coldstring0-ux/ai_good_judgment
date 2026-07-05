@@ -34,7 +34,7 @@ export async function POST(req: Request) {
         .where(eq(predictions.id, p.id));
     }
 
-    return Response.json({ success: true, brierScore: (allPredictions[allPredictions.length - 1]?.probability ?? 0.5 - outcomeNum) ** 2 });
+    return Response.json({ success: true, brierScore: ((allPredictions[allPredictions.length - 1]?.probability ?? 0.5) - outcomeNum) ** 2 });
   } catch (error) {
     console.error("Resolve prediction error:", error);
     return Response.json({ error: "Internal server error" }, { status: 500 });

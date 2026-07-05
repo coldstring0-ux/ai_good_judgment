@@ -40,7 +40,7 @@ export function DashboardClient({ userId, userName, phase }: DashboardClientProp
   }
 
   const stats = {
-    streak: 0,
+    streak: data?.streak ?? 0,
     todayDrills: 0,
     completedDrills: data?.drillStats?.completed ?? 0,
     totalDrills: data?.drillStats?.total ?? 0,

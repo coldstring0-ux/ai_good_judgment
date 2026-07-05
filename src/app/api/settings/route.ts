@@ -1,6 +1,7 @@
 import { db } from "@/lib/db/client";
 import { users } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
+import { encrypt, decrypt } from "@/lib/utils/crypto";
 
 export async function POST(req: Request) {
   try {
@@ -18,13 +19,13 @@ export async function POST(req: Request) {
     const currentSettings = (user.settings as Record<string, any>) ?? {};
     const newSettings = {
       ...currentSettings,
-      ...(deepseekKey !== undefined ? { deepseekKey } : {}),
-      ...(openaiKey !== undefined ? { openaiKey } : {}),
+      ...(deepseekKey !== undefined ? { deepseekKey: encrypt(deepseekKey) } : {}),
+      ...(openaiKey !== undefined ? { openaiKey: encrypt(openaiKey) } : {}),
       ...(aiProvider !== undefined ? { aiProvider } : {}),
     };
 
     await db.update(users)
-      .set({ settings: newSettings as any })
+      .set({ settings: newSettings })
       .where(eq(users.id, userId));
 
     return Response.json({ success: true });

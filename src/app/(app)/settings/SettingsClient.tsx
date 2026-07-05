@@ -5,14 +5,16 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Eye, EyeOff, CheckCircle2, Loader2 } from "lucide-react";
+import { Eye, EyeOff, CheckCircle2, Loader2, Moon, Sun } from "lucide-react";
 import { toast } from "sonner";
+import { useTheme } from "@/components/shared/ThemeProvider";
 
 interface SettingsClientProps {
   userId: string;
 }
 
 export function SettingsClient({ userId }: SettingsClientProps) {
+  const { theme, toggleTheme } = useTheme();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [showDeepseek, setShowDeepseek] = useState(false);
@@ -142,6 +144,24 @@ export function SettingsClient({ userId }: SettingsClientProps) {
             {saving ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <CheckCircle2 className="h-4 w-4 mr-1" />}
             保存
           </Button>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>外观</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium">主题模式</p>
+              <p className="text-xs text-muted-foreground mt-0.5">切换深色/浅色主题</p>
+            </div>
+            <Button variant="outline" size="sm" onClick={toggleTheme}>
+              {theme === "dark" ? <Sun className="h-4 w-4 mr-1" /> : <Moon className="h-4 w-4 mr-1" />}
+              {theme === "dark" ? "浅色模式" : "深色模式"}
+            </Button>
+          </div>
         </CardContent>
       </Card>
 

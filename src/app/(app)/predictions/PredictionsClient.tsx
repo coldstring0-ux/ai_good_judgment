@@ -130,19 +130,50 @@ export function PredictionsClient({ userId, initialQuestions }: PredictionsClien
     setUpdatingProb(true);
 
     try {
-      const res = await fetch("/api/predictions/bayesian", {
+      const res = await fetch("/api/predictions/update-with-evidence", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          priorProbability: activeQuestion.latestPrediction.probability,
+          questionId: activeQuestion.id,
+          userId,
+          evidenceSummary: newEvidence,
           evidenceStrength: newEvidenceStrength,
           evidenceDirection: newEvidenceDir,
         }),
       });
       const data = await res.json();
+      if (data.error) throw new Error(data.error);
+
       setBayesianResult(data);
+
+      // Update the local question state with the new version
+      setQuestions(prev => prev.map(q =>
+        q.id === activeQuestion.id
+          ? {
+              ...q,
+              latestPrediction: q.latestPrediction
+                ? {
+                    ...q.latestPrediction,
+                    probability: data.posteriorProbability,
+                    version: data.version,
+                    createdAt: new Date().toISOString(),
+                  }
+                : null,
+            }
+          : q
+      ));
+
+      setActiveQuestion(prev => prev ? {
+        ...prev,
+        latestPrediction: prev.latestPrediction
+          ? { ...prev.latestPrediction, probability: data.posteriorProbability, version: data.version, createdAt: new Date().toISOString() }
+          : null,
+      } : null);
+
+      setNewEvidence("");
+      toast.success("证据已保存，概率已更新！");
     } catch (err) {
-      toast.error("计算失败");
+      toast.error("更新失败");
     } finally {
       setUpdatingProb(false);
     }
@@ -171,11 +202,19 @@ export function PredictionsClient({ userId, initialQuestions }: PredictionsClien
     }
   };
 
-  const addSource = () => {
+  const addSource = async () => {
     if (!sourceUrl) return;
-    const gradeMap = ["F", "D", "C", "B", "A"];
-    const randomGrade = gradeMap[Math.floor(Math.random() * 3) + 2]; // C, B, A
-    setSources(prev => [...prev, { url: sourceUrl, title: sourceTitle || sourceUrl, grade: randomGrade }]);
+    try {
+      const res = await fetch("/api/sources/grade", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: sourceUrl, title: sourceTitle || undefined }),
+      });
+      const data = await res.json();
+      setSources(prev => [...prev, { url: sourceUrl, title: sourceTitle || sourceUrl, grade: data.grade }]);
+    } catch {
+      setSources(prev => [...prev, { url: sourceUrl, title: sourceTitle || sourceUrl, grade: "C" }]);
+    }
     setSourceUrl("");
     setSourceTitle("");
   };

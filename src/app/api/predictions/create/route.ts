@@ -10,6 +10,10 @@ export async function POST(req: Request) {
       return Response.json({ error: "Missing required fields" }, { status: 400 });
     }
 
+    if (probability !== undefined && (typeof probability !== "number" || probability < 0 || probability > 1)) {
+      return Response.json({ error: "Probability must be a number between 0 and 1" }, { status: 400 });
+    }
+
     const questionId = uuid();
     const now = new Date();
 

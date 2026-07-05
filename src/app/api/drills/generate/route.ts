@@ -3,6 +3,7 @@ import { db } from "@/lib/db/client";
 import { drills, users } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { v4 as uuid } from "uuid";
+import { decrypt } from "@/lib/utils/crypto";
 
 export async function POST(req: Request) {
   let type: "quantification" | "bias_check" | "confidence_interval" = "quantification";
@@ -23,16 +24,22 @@ export async function POST(req: Request) {
       const user = await db.select().from(users).where(eq(users.id, userId)).then(r => r[0]);
       const settings = (user?.settings as Record<string, any>) ?? {};
       const provider = settings.aiProvider ?? process.env.AI_PROVIDER ?? "deepseek";
-      apiKey = provider === "openai" ? settings.openaiKey : settings.deepseekKey;
+      const encryptedKey = provider === "openai" ? settings.openaiKey : settings.deepseekKey;
+      if (encryptedKey) apiKey = decrypt(encryptedKey);
     } catch {} // Fall back to env vars if DB lookup fails
 
     const aiResult = await generateDrill({ type, phase, domains, apiKey });
     const fallback = getFallbackDrill(type);
 
     // Merge AI result with fallback for missing fields
+    let correctAnswer = aiResult.correctAnswer ?? aiResult.correctRange ?? fallback.correctAnswer ?? null;
+    // Normalize: AI returns decimal (0-1), fallback uses percentage (0-100 or [30,50] for range)
+    if (correctAnswer !== null && type === "quantification" && Array.isArray(correctAnswer) && correctAnswer[0] <= 1) {
+      correctAnswer = [Math.round(correctAnswer[0] * 100), Math.round(correctAnswer[1] * 100)];
+    }
     const question = aiResult.question || fallback.question;
     const metadata = {
-      correctAnswer: aiResult.correctAnswer ?? aiResult.correctRange ?? fallback.correctAnswer ?? null,
+      correctAnswer,
       explanation: aiResult.explanation || fallback.explanation || "",
       biasType: aiResult.biasType || fallback.biasType || null,
       difficulty: aiResult.difficulty || fallback.difficulty || "medium",
