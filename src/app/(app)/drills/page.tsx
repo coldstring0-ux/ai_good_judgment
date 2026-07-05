@@ -1,15 +1,12 @@
-import { auth } from "@/lib/auth";
-import { redirect } from "next/navigation";
 import { db } from "@/lib/db/client";
 import { drills as drillsTable, users } from "@/lib/db/schema";
 import { eq, desc } from "drizzle-orm";
+import { requireAuth } from "@/lib/env/auth";
 import { DrillsClient } from "./DrillsClient";
 
 async function getDrills() {
-  const session = await auth();
-  if (!session?.user?.id) redirect("/login");
-
-  const userId = session.user.id as string;
+  const session = await requireAuth();
+  const userId = session.user.id;
 
   const [user, userDrills] = await Promise.all([
     db.select().from(users).where(eq(users.id, userId)).then(r => r[0]),

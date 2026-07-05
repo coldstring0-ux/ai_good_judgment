@@ -4,6 +4,8 @@ import { drills, users } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { v4 as uuid } from "uuid";
 import { decrypt } from "@/lib/utils/crypto";
+import { isDev } from "@/lib/env";
+import { getDevApiKey } from "@/lib/env/dev-key-store";
 
 export async function POST(req: Request) {
   let type: "quantification" | "bias_check" | "confidence_interval" = "quantification";
@@ -18,15 +20,21 @@ export async function POST(req: Request) {
       return Response.json({ error: "Missing required fields: phase, userId" }, { status: 400 });
     }
 
-    // Fetch user's API key from settings
+    // Fetch API key: dev mode uses global key, test/prod reads from user settings
     let apiKey: string | undefined;
-    try {
-      const user = await db.select().from(users).where(eq(users.id, userId)).then(r => r[0]);
-      const settings = (user?.settings as Record<string, any>) ?? {};
-      const provider = settings.aiProvider ?? process.env.AI_PROVIDER ?? "deepseek";
-      const encryptedKey = provider === "openai" ? settings.openaiKey : settings.deepseekKey;
-      if (encryptedKey) apiKey = decrypt(encryptedKey);
-    } catch {} // Fall back to env vars if DB lookup fails
+    if (isDev()) {
+      // Dev mode: use the global dev API key (set via Settings page)
+      apiKey = getDevApiKey() ?? undefined;
+    } else {
+      // Test/Prod mode: read encrypted key from user settings
+      try {
+        const user = await db.select().from(users).where(eq(users.id, userId)).then(r => r[0]);
+        const settings = (user?.settings as Record<string, any>) ?? {};
+        const provider = settings.aiProvider ?? process.env.AI_PROVIDER ?? "deepseek";
+        const encryptedKey = provider === "openai" ? settings.openaiKey : settings.deepseekKey;
+        if (encryptedKey) apiKey = decrypt(encryptedKey);
+      } catch {} // Fall back to env vars if DB lookup fails
+    }
 
     const aiResult = await generateDrill({ type, phase, domains, apiKey });
     const fallback = getFallbackDrill(type);

@@ -1,5 +1,4 @@
-import { auth } from "@/lib/auth";
-import { redirect } from "next/navigation";
+import { requireAuth } from "@/lib/env/auth";
 import { db } from "@/lib/db/client";
 import { predictionQuestions, predictions } from "@/lib/db/schema";
 import { eq, and, desc } from "drizzle-orm";
@@ -37,9 +36,7 @@ async function getUserPredictions(userId: string) {
 }
 
 export default async function PredictionsPage() {
-  const session = await auth();
-  if (!session?.user?.id) redirect("/login");
-
+  const session = await requireAuth();
   const userId = session.user.id;
   const activeQuestions = await getUserPredictions(userId);
 

@@ -3,6 +3,8 @@ import { drills, users } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { getCoachingFeedback } from "@/lib/ai";
 import { decrypt } from "@/lib/utils/crypto";
+import { isDev } from "@/lib/env";
+import { getDevApiKey } from "@/lib/env/dev-key-store";
 
 export async function POST(req: Request) {
   try {
@@ -70,10 +72,17 @@ export async function POST(req: Request) {
     // Try to get AI coaching feedback
     let aiFeedback: string | undefined;
     try {
-      const user = await db.select().from(users).where(eq(users.id, userId)).then(r => r[0]);
-      const settings = (user?.settings as Record<string, any>) ?? {};
-      const encryptedKey = settings.deepseekKey ?? settings.openaiKey;
-      const apiKey = encryptedKey ? decrypt(encryptedKey) : undefined;
+      let apiKey: string | undefined;
+      if (isDev()) {
+        // Dev mode: use the global dev API key
+        apiKey = getDevApiKey() ?? undefined;
+      } else {
+        // Test/Prod mode: read encrypted key from user settings
+        const user = await db.select().from(users).where(eq(users.id, userId)).then(r => r[0]);
+        const settings = (user?.settings as Record<string, any>) ?? {};
+        const encryptedKey = settings.deepseekKey ?? settings.openaiKey;
+        apiKey = encryptedKey ? decrypt(encryptedKey) : undefined;
+      }
 
       aiFeedback = await getCoachingFeedback({
         question: drill.question,
